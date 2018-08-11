@@ -13,10 +13,70 @@ NbtValue
 NbtFlate
 
  */
-extern crate byteorder;
 use byteorder::{BigEndian, ReadBytesExt};//, WriteBytesExt};
 
 use std::collections::HashMap;
+
+
+type NbtMeta = (u8, String);
+
+const TYPE_ID_END: u8 = 0;
+const TYPE_ID_BYTE: u8 = 1;
+const TYPE_ID_SHORT: u8 = 2;
+const TYPE_ID_INT: u8 = 3;
+const TYPE_ID_LONG: u8 = 4;
+const TYPE_ID_FLOAT: u8 = 5;
+const TYPE_ID_DOUBLE: u8 = 6;
+const TYPE_ID_BYTE_ARRAY: u8 = 7;
+const TYPE_ID_STRING: u8 = 8;
+const TYPE_ID_LIST: u8 = 9;
+const TYPE_ID_COMPOUND: u8 = 10;
+const TYPE_ID_INT_ARRAY: u8 = 11;
+const TYPE_ID_LONG_ARRAY: u8 = 12;
+
+#[derive(Debug, PartialEq)]
+pub struct NbtData {
+    root_name: String,
+    root_tag: NbtTag
+}
+
+#[derive(Debug, PartialEq)]
+pub enum NbtTag {
+    Byte(i8),
+    Short(i16),
+    Int(i32),
+    Long(i64),
+    Float(f32),
+    Double(f64),
+    ByteArray(Vec<i8>),
+    String(String),
+    List(Vec<NbtTag>),
+    Compound(HashMap<String, NbtTag>),
+    IntArray(Vec<i32>),
+    LongArray(Vec<i64>)
+}
+
+// impl NbtTag {
+
+//     fn type_id(&self) -> u8 {
+//         use self::NbtTag::*;
+// 	    match self {
+//             End => TYPE_ID_END,
+// 	        Byte(_) => TYPE_ID_BYTE,
+// 	        Short(_) => TYPE_ID_SHORT,
+// 	        Int(_) => TYPE_ID_INT,
+// 	        Long(_) => TYPE_ID_LONG,
+// 	        Float(_) => TYPE_ID_FLOAT,
+// 	        Double(_) => TYPE_ID_DOUBLE,
+// 	        ByteArray(_) => TYPE_ID_BYTE_ARRAY,
+// 	        String(_) => TYPE_ID_STRING,
+// 	        List(_) => TYPE_ID_LIST,
+// 	        Compound(_) => TYPE_ID_COMPOUND,
+// 	        IntArray(_) => TYPE_ID_INT_ARRAY,
+// 	        LongArray(_) => TYPE_ID_LONG_ARRAY,
+// 	    }
+//     }
+// }
 
 use std::io::Error as IoError;
 use std::string::FromUtf8Error;
@@ -62,14 +122,19 @@ impl<T> NbtRead for T where T: std::io::Read {
     }
 }
 
-trait NbtWrite {
+//pub trait NbtWrite {
+//
+//    fn write_nbt_data(&mut self, data: NbtData) -> NbtResult<()>;
+//}
 
-    fn write_nbt_data(&mut self, data: NbtData) -> NbtResult<()>;
-}
 
-type NbtMeta = (u8, String);
 
-#[inline] 
+
+
+
+
+
+#[inline]
 fn read_string<R: std::io::Read>(read: &mut R) -> NbtResult<String> {
     let len = read.read_u16::<BigEndian>()? as usize;
     if len == 0 {
@@ -80,7 +145,7 @@ fn read_string<R: std::io::Read>(read: &mut R) -> NbtResult<String> {
     Ok(String::from_utf8(buf)?)
 }
 
-#[inline] 
+#[inline]
 fn read_meta<R: std::io::Read>(read: &mut R) -> NbtResult<NbtMeta> {
     match read.read_u8()? {
         TYPE_ID_END => Ok((TYPE_ID_END, "".to_string())),
@@ -97,7 +162,7 @@ macro_rules! list_read_len {
 
 macro_rules! read_array {
     ($func_name: ident, $read_expr: ident, $read_into: ident) => {
-#[inline] 
+#[inline]
 fn $func_name<R: std::io::Read>(read: &mut R) -> NbtResult<NbtTag> {
     list_read_len!(read, len);
     let mut buf = vec![0; len];
@@ -120,7 +185,7 @@ fn read_byte_array_content<R: std::io::Read>(read: &mut R) -> NbtResult<NbtTag> 
     Ok(NbtTag::ByteArray(buf))
 }
 
-#[inline] 
+#[inline]
 fn read_content<R: std::io::Read>(read: &mut R, type_id: u8) -> NbtResult<NbtTag> {
     match type_id {
         TYPE_ID_BYTE => Ok(NbtTag::Byte(read.read_i8()?)),
@@ -156,63 +221,11 @@ fn read_content<R: std::io::Read>(read: &mut R, type_id: u8) -> NbtResult<NbtTag
     }
 }
 
-const TYPE_ID_END: u8 = 0;
-const TYPE_ID_BYTE: u8 = 1;
-const TYPE_ID_SHORT: u8 = 2;
-const TYPE_ID_INT: u8 = 3;
-const TYPE_ID_LONG: u8 = 4;
-const TYPE_ID_FLOAT: u8 = 5;
-const TYPE_ID_DOUBLE: u8 = 6;
-const TYPE_ID_BYTE_ARRAY: u8 = 7;
-const TYPE_ID_STRING: u8 = 8;
-const TYPE_ID_LIST: u8 = 9;
-const TYPE_ID_COMPOUND: u8 = 10;
-const TYPE_ID_INT_ARRAY: u8 = 11;
-const TYPE_ID_LONG_ARRAY: u8 = 12;
 
-#[derive(Debug, PartialEq)]
-pub struct NbtData {
-    root_name: String,
-    root_tag: NbtTag
-}
 
-#[derive(Debug, PartialEq)]
-enum NbtTag {
-    Byte(i8),
-    Short(i16),
-    Int(i32),
-    Long(i64),
-    Float(f32),
-    Double(f64),
-    ByteArray(Vec<i8>),
-    String(String),
-    List(Vec<NbtTag>),
-    Compound(HashMap<String, NbtTag>),
-    IntArray(Vec<i32>),
-    LongArray(Vec<i64>)
-}
 
-// impl NbtTag {
-    
-//     fn type_id(&self) -> u8 {
-//         use self::NbtTag::*;
-// 	    match self {
-//             End => TYPE_ID_END, 
-// 	        Byte(_) => TYPE_ID_BYTE,
-// 	        Short(_) => TYPE_ID_SHORT,
-// 	        Int(_) => TYPE_ID_INT,
-// 	        Long(_) => TYPE_ID_LONG,
-// 	        Float(_) => TYPE_ID_FLOAT,
-// 	        Double(_) => TYPE_ID_DOUBLE,
-// 	        ByteArray(_) => TYPE_ID_BYTE_ARRAY,
-// 	        String(_) => TYPE_ID_STRING,
-// 	        List(_) => TYPE_ID_LIST,
-// 	        Compound(_) => TYPE_ID_COMPOUND,
-// 	        IntArray(_) => TYPE_ID_INT_ARRAY,
-// 	        LongArray(_) => TYPE_ID_LONG_ARRAY,
-// 	    }
-//     }
-// }
+
+
 
 #[cfg(test)]
 mod tests {

@@ -1,27 +1,24 @@
-// .0:  None: transparent, Some("air"): air, Some("stone"): etc
-#[derive(Clone, Debug, Eq, PartialEq, Hash)]
-pub struct BlockId(Option<&'static str>);
+use std::borrow::Cow;
 
-impl From<Option<&'static str>> for BlockId {
-    fn from(src: Option<&'static str>) -> BlockId {
-        BlockId(src)
-    }
-}
+pub type Id<'a> = Cow<'a, str>;
 
-impl From<&'static str> for BlockId {
-    fn from(src: &'static str) -> BlockId {
-        BlockId(Some(src))
-    }
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-impl PartialEq<Option<&'static str>> for BlockId {
-    fn eq(&self, other: &Option<&'static str>) -> bool {
-        self.0.eq(other)
-    }
-}
+    #[allow(dead_code)]
+    fn uses_id(_: impl Into<Id<'a>>) {}
 
-impl PartialEq<BlockId> for Option<&'static str> {
-    fn eq(&self, other: &BlockId) -> bool {
-        other.0.eq(self)
+    #[test]
+    fn test_id() {
+        let a = Id::from(Cow::from("minecraft:stone"));
+        let b = Id::from(Cow::from(String::from("minecraft:stone")));
+        let c = "minecraft:stone";
+        let d = String::from("minecraft:stone");
+        assert_eq!(a, b);
+        uses_id(a);
+        uses_id(b);
+        uses_id(c);
+        uses_id(d);
     }
 }
