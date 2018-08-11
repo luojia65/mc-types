@@ -1,0 +1,10 @@
+cargo-features = ["edition"]
+
+[package]
+name = "mc-types"
+version = "0.0.0"
+authors = ["luojia65 <me@luojia.cc>"]
+edition = '2018'
+
+[dependencies]
+byteorder = "*"
