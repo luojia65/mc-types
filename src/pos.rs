@@ -1,5 +1,5 @@
 // x, y, z
-#[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
+#[derive(Copy, Clone, Default, Eq, PartialEq, Hash, Debug)]
 pub struct BlockPos(u64);
 
 impl BlockPos {
@@ -30,3 +30,5 @@ impl From<(i32, i32, i32)> for BlockPos {
         BlockPos::from_xyz(src.0, src.1, src.2)
     }
 }
+
+// no magic here
