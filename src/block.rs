@@ -195,7 +195,7 @@ mod tests {
     #[test]
     fn read_write_block() -> Result<()> {
         let world = TestWorld;
-        let mut cur: = Cursor::new(world);
+        let mut cur = Cursor::new(world);
         let state = cur.get_block_state((0, 0, 0))?;
         println!("{:?}", state);
         Ok(())
