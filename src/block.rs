@@ -33,9 +33,6 @@ pub trait Write { // block::Write
 }
 
 
-use std::collections::HashMap;
-use std::hash::Hash;
-
 // `I` implies an underlying block
 #[derive(Debug, Clone)]
 pub struct Cursor<I> { // block::Cursor
@@ -198,7 +195,7 @@ mod tests {
     #[test]
     fn read_write_block() -> Result<()> {
         let world = TestWorld;
-        let mut cur: Cursor<TestWorld, String> = Cursor::new(world);
+        let mut cur: = Cursor::new(world);
         let state = cur.get_block_state((0, 0, 0))?;
         println!("{:?}", state);
         Ok(())
@@ -208,7 +205,7 @@ mod tests {
     #[should_panic]
     fn write_block() {
         let world = TestWorld;
-        let mut cur: Cursor<TestWorld, String> = Cursor::new(world);
+        let mut cur = Cursor::new(world);
         cur.set_block_state((1, 1, 1), State(1)).unwrap();
     }
     
