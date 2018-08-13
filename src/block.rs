@@ -264,8 +264,8 @@ mod tests {
         
         fn block_id_to_state(&self, id: Id) -> State {
             match id.0 {
-                id if id == "minecraft:air" => State(0),
-                id if id == "minecraft:sponge" => State(70),
+                ref id if id == "minecraft:air" => State(0),
+                ref id if id == "minecraft:sponge" => State(70),
                 _ => panic!("Unsupported block")
             }
         }
