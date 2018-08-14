@@ -11,6 +11,36 @@ NbtWrite
 NbtValue
 NbtFlate
 
+
+// create a structure for following NBT read/write
+NbtVia 
+
+// decalres `level_name` and `generator_name`
+let via = nbt_via!{
+    "" compound matches {    
+        "Data" compound matches {
+            "LevelName" into level_name
+            "generatorName" into generator_name 
+            "version" matches int 19133
+        }
+    }
+};
+// or declare like this:
+let mut via = NbtVia::new();
+via.split(".");
+via.add_type_match("", TYPE_ID_COMPOUND);
+via.add_type_match(".Data", TYPE_ID_COMPOUND);
+via.add_value_match(".Data.version", NbtTag::Int(19133));
+let mut level_name;
+via.add_value_parse(".Data.LevelName", &mut level_name);
+let mut generator_name;
+via.add_value_parse(".Data.generatorName", &mut generator_name);
+
+let mut cur = Cursor::new(buf);
+via.parse(&mut cur)?;
+// uses `level_name` and `generator_name` which are both instances of NbtTag
+println!("Name: {:?}, Generaor: {:?}", level_name, generator_name);
+
  */
 use byteorder::{BigEndian, ReadBytesExt};//, WriteBytesExt};
 

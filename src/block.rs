@@ -8,16 +8,13 @@ pub type Result<T> = std::result::Result<T, Error>;
 let world = FileWorld::from("file://~/worlds/test_world/");
 let mut cur = BlockCursor::new(&mut world);
 
-
 let pos = BlockPos::from_xyz(1, 2, 3);
-cur.set_position(pos);
-cur.seek_block(/* */)?;
-cur.write_block(pos, state);
+cur.set_block_id(pos, "minecraft:air");
 
  */
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
-pub struct State(u16); // Id, meta, etc.
+pub struct Meta(u16); // Id, meta, etc.
 
 // `I` implies an underlying block
 #[derive(Debug, Clone)]
@@ -53,7 +50,7 @@ pub trait Read { // block::Read
     // read the block from currect position.
     // the current position is NOT advanced.
     // panic if the currect position is not valid
-    fn read_block(&self) -> Result<State>;
+    fn read_block(&self) -> Result<Meta>;
 }
 
 // usually for wrappers, such as `Cursor`
@@ -62,30 +59,30 @@ pub trait Write { // block::Write
     // the current position is NOT advanced. 
     // the writer may also initalize block buffer for it
     // panic if the currect position is not valid
-    fn write_block(&mut self, new_state: State) -> Result<()>;
+    fn write_block(&mut self, new_meta: Meta) -> Result<()>;
 }
 
 // usually for buffered world itself
 pub trait ReadExact {
     // read block exactly at the position `pos`
-    fn read_block_exact(&self, pos: Pos) -> Result<State>; 
+    fn read_block_exact(&self, pos: Pos) -> Result<Meta>; 
 }
 
 // usually for buffered world itself
 pub trait WriteExact {
 
-    fn write_block_exact(&mut self, pos: Pos, state: State) -> Result<()>; 
+    fn write_block_exact(&mut self, pos: Pos, meta: Meta) -> Result<()>; 
 }
 
 impl<I: ReadExact> Read for Cursor<I> {
-    fn read_block(&self) -> Result<State> {
+    fn read_block(&self) -> Result<Meta> {
         self.inner.read_block_exact(self.pos)
     } 
 } 
  
 impl<I: WriteExact> Write for Cursor<I> {
-    fn write_block(&mut self, new_state: State) -> Result<()> {
-        self.inner.write_block_exact(self.pos, new_state)
+    fn write_block(&mut self, new_meta: Meta) -> Result<()> {
+        self.inner.write_block_exact(self.pos, new_meta)
     }
 }
 
@@ -102,7 +99,7 @@ impl<I: Validate> Cursor<I> {
 
 impl<I: ReadExact + Validate> Cursor<I> {
     // must ensure that this is a valid position
-    pub fn get_block_state(&mut self, pos: impl Into<Pos>) -> Result<State> {
+    pub fn get_block_meta(&mut self, pos: impl Into<Pos>) -> Result<Meta> {
         let pos = pos.into();
         self.set_position(pos);
         self.read_block()
@@ -111,10 +108,10 @@ impl<I: ReadExact + Validate> Cursor<I> {
 
 impl<I: WriteExact + Validate> Cursor<I> {
     // must ensure that this is a valid position
-    pub fn set_block_state(&mut self, pos: impl Into<Pos>, state: State) -> Result<()> {
+    pub fn set_block_meta(&mut self, pos: impl Into<Pos>, meta: Meta) -> Result<()> {
         let pos = pos.into();
         self.set_position(pos);
-        self.write_block(state)
+        self.write_block(meta)
     }
 }
 
@@ -169,19 +166,19 @@ impl<I: AsRef<str>> PartialEq<I> for Id {
     }
 }  
 
-// a block system that maps state with actual string id.
-// for example it converts "minecraft:stone" into BlockState(1). 
+// a block system that maps meta with actual string id.
+// for example it converts "minecraft:stone" into Blockmeta(1). 
 // the inner number is intended for internal use and may vary between implementations.
 // often contained in worlds. one world imply one block system, and may not change in runtime
 pub trait System {
-    // check if this state is registered
-    fn has_block_state(&self, state: State) -> bool;
-    // panic if block state not found
-    fn block_state_to_id(&self, state: State) -> Id;
+    // check if this meta is registered
+    fn has_block_meta(&self, meta: Meta) -> bool;
+    // panic if block meta not found
+    fn block_meta_to_id(&self, meta: Meta) -> Id;
     // check if this block id is registered
     fn has_block_id(&self, id: Id) -> bool;
-    // panic if block state not found
-    fn block_id_to_state(&self, id: Id) -> State;
+    // panic if block meta not found
+    fn block_id_to_meta(&self, id: Id) -> Meta;
 }
 
 pub trait Operate {
@@ -192,18 +189,208 @@ pub trait Operate {
 impl<I: Operate + ReadExact + Validate> Cursor<I> {
     // must ensure that this is a valid position
     pub fn get_block_id(&mut self, pos: impl Into<Pos>) -> Result<Id> {
-        let state = self.get_block_state(pos)?;
-        Ok(self.inner.block_system().block_state_to_id(state))
+        let meta = self.get_block_meta(pos)?;
+        Ok(self.inner.block_system().block_meta_to_id(meta))
     }
 }
 
 impl<I: Operate + WriteExact + Validate> Cursor<I> {
     // must ensure that this is a valid position
     pub fn set_block_id(&mut self, pos: impl Into<Pos>, id: impl Into<Id>) -> Result<()> {
-        let state = self.inner.block_system().block_id_to_state(id.into());
-        self.set_block_state(pos, state)
+        let meta = self.inner.block_system().block_id_to_meta(id.into());
+        self.set_block_meta(pos, meta)
     }
 }
+
+// todo: GLOBAL SYSTEM
+// pub static GLOBAL_SYSTEM: HashSystem = HashSystem::new();
+// pub static META_BLOCK_AIR: Meta = GLOBAL_SYSTEM.block_id_to_meta(Id::from("minecraft:air"));
+// pub static META_BLOCK_STONE: Meta = GLOBAL_SYSTEM.block_id_to_meta(Id::from("minecraft:stone"));
+
+macro_rules! reg_blocks {
+    ($sys: ident $(,$id_string: expr)+) => {
+        $($sys.register_block($id_string);)+
+    };
+}
+
+pub fn global_system() -> HashSystem {
+    let mut ans = HashSystem::new();
+    reg_blocks!(ans,
+        "minecraft:air",
+        "minecraft:stone",
+        "minecraft:sponge"
+    );
+    ans
+}
+
+// default system def
+use std::collections::HashMap;
+#[derive(Debug, Default)]
+pub struct HashSystem {
+    mti: HashMap<Meta, Id>,
+    itm: HashMap<Id, Meta>,
+    next_inner: u16
+}
+
+impl HashSystem {
+    pub fn new() -> HashSystem {
+        Default::default()
+    }
+
+    pub fn register_block(&mut self, id: impl Into<Id>) -> Meta {
+        let id = id.into();
+        let meta = Meta(self.next_inner);
+        self.itm.insert(id.clone(), meta.clone());
+        self.mti.insert(meta.clone(), id);
+        self.next_inner += 1;
+        meta
+    }
+}
+
+impl System for HashSystem {
+    
+    fn has_block_meta(&self, meta: Meta) -> bool {
+        self.mti.contains_key(&meta)
+    }
+    
+    fn block_meta_to_id(&self, meta: Meta) -> Id {
+        self.mti[&meta].clone()
+    }   
+    
+    fn has_block_id(&self, id: Id) -> bool {
+        self.itm.contains_key(&id)
+    }
+    
+    fn block_id_to_meta(&self, id: Id) -> Meta {
+        self.itm[&id]
+    }
+}
+
+// define our own cursors
+// match with System, following PC rules
+
+/*
+Anvil: facing
+Banner(standing): rotation, waterlogged
+Banner(wall): facing, waterlogged
+Wall: facing, waterlogged
+Bed: facing, occupied, part
+Beetroot: age 0~3
+Bone block: axis
+Brewing stand: has_bottle_{0~2}
+Button: face, facing, powered
+Cactus: age 0~15
+Cake: bites 0~6
+Carrot: age 0~7
+Carved pumpkin: facing
+Cauldron: level 0~3
+Chest(Trapped ~): facing, type, waterlogged
+Chorus flower: age 0~5
+Chorus plant: north, south, east, west, up, down
+Cobblestone wall(Mossy ~): north, south, east, west, up, waterlogged
+Cocoa: age, facing
+Command block: conditional, facing
+Daylight detector: inverted, power
+Dispenser: facing, triggered
+Door: facing, half, hinge, open, powered
+Dropper: facing, triggered
+Ender chest: facing, waterlogged // not able to connect chests
+End portal frame: eye, facing
+End rod: facing
+Farmland: moisture 0~7
+Fence: north, south, east, west, waterlogged
+Fence gate: facing, in_wall, open, powered
+Fire: age, up, noeth, south, east, west
+Frosted Ice: age 0~3
+Furnace: facing, lit
+Glass pane(Stained ~): north, south, east, west, waterlogged
+Glazed Terracotta: facing
+Grass Block, Mycelium, Podzol: snowy
+Hay bale: axis
+Hopper: enable, facing
+Iron bars: north, south, east, west
+Jack o'lantern: facing
+Jukebox: has_record
+Kelp: age 0~25
+Ladder: facing, waterlogged
+Large Flowers: half
+Lava: level
+Leaves: persistent, distance
+Lever: face, facing, powered
+Logs: axis
+Melon stem/Pumpkin stem: age 0~7
+Melon stem/Pumpkin stem(attached): facing
+Mob head(on floor): rotation
+Mob head(on wall): facing
+Mushroom block: down, east, north, south, up, west
+Nether wart: age 0~3
+Nether portal: axis
+Observer: facing, powered
+Pistons(Static, Sticky ~): extended, facing
+Pistons(Moving): facing, type
+Piston Head: facing, short, type
+Potato: age 0~7
+Pressure plate: powered
+Pressure plate(weighted): power 0~15
+Purpur pillar: axis
+Quartz pillar: axis
+Rails: shape
+Rail(Activator ~, Detector ~, Powered ~): powered, shape
+Redstone comparator: facing, mode, powered
+Redstone dust: ??
+Redstone ore: lit
+Redstone repeater: delay. facing, locked, powered
+Redstone torch: lit
+Redstone torch(wall): lit, facing
+Sapling: stage
+Seagrass: half // unable to be placed out of water
+Sea pickle: pickles, waterlogged
+Shulker box: facing
+Sign: rotation, waterlogged
+Wall: facing, waterlogged
+Slabs: type, waterlogged
+Snow: layers 1~8
+Stairs: facing, half,shape, waterlogged
+Structure block: mode
+Sugar canes: age 0~15
+Tall grass, Large fern: half
+TNT: unstable //needs test
+Trapdoor: facing, half, open, powered, waterlogged 
+Tripwire: attached, disarmed, notrh, south. easet, west, powered
+Tripwire hook: attached, facing, powered
+Turtle egg: eggs 1~4, hatch 0~2
+Vines: north, south, east, west, up
+Wall torch: facing
+Water: level
+Wheat: age 0~7
+Wood: axis
+//finish here
+
+ */
+/*
+pub trait SignRead {...}
+pub trait SignWrite {...}
+impl<I> SignRead for Cursor<I> {...}
+...
+
+
+//block facing
+
+
+//procceed sth about liquid & waterlogged
+// 关于流体，存储的时候不需要分开来
+
+pub enum LiquidType {} // 自定义？
+// 是否被水淹没等信息
+pub trait LiquidRead {...}
+
+
+// grass & flower
+//structure block
+ */
+
+// PistonPolicy (varies between editions)
+// RedTransmitPolicy
 
 // pub trait ChunkRead 
 
@@ -213,11 +400,11 @@ impl<I: Operate + WriteExact + Validate> Cursor<I> {
 mod tests {
     use crate::block::*;
     // every block is "minecraft:air" except (0, 60, 0) is "minecraft:sponge"
-    struct TestWorld(TestBlockSystem);
+    struct TestWorld(Box<System>);
 
     impl TestWorld {
         pub fn new() -> TestWorld {
-            TestWorld(TestBlockSystem)
+            TestWorld(Box::new(global_system()))
         }
     }
 
@@ -228,52 +415,23 @@ mod tests {
     }
 
     impl ReadExact for TestWorld {
-        fn read_block_exact(&self, pos: Pos) -> Result<State> {
+        fn read_block_exact(&self, pos: Pos) -> Result<Meta> {
             Ok(match pos {
-                p if p != Pos::from_xyz(0, 60, 0) => State(0),
-                _ => State(70) //todo state to id
+                p if p != Pos::from_xyz(0, 60, 0) => self.0.block_id_to_meta(Id::from("minecraft:air")),
+                _ => self.0.block_id_to_meta(Id::from("minecraft:sponge"))
             })
         }    
     }
 
     impl WriteExact for TestWorld {
-        fn write_block_exact(&mut self, _pos: Pos, _state: State) -> Result<()> {
+        fn write_block_exact(&mut self, _pos: Pos, _meta: Meta) -> Result<()> {
             Err(Error::new(std::io::ErrorKind::PermissionDenied, "Operation not supported"))
-        }
-    }
-
-    struct TestBlockSystem;
-
-    impl System for TestBlockSystem {
-
-        fn has_block_state(&self, state: State) -> bool {
-            state.0 == 0 || state.0 == 70
-        }
-        
-        fn block_state_to_id(&self, state: State) -> Id {
-            match state.0 {
-                0 => Id::from("minecraft:air"),
-                70 => Id::from("minecraft:sponge"),
-                _ => panic!("Unsupported block")
-            }
-        }
-        
-        fn has_block_id(&self, id: Id) -> bool {
-            id.0 == "minecraft:air" || id.0 == "minecraft:sponge"
-        }
-        
-        fn block_id_to_state(&self, id: Id) -> State {
-            match id.0 {
-                ref id if id == "minecraft:air" => State(0),
-                ref id if id == "minecraft:sponge" => State(70),
-                _ => panic!("Unsupported block")
-            }
         }
     }
 
     impl Operate for TestWorld {
         fn block_system(&self) -> &dyn System {
-            &self.0
+            self.0.as_ref()
         }
     }
 
@@ -281,8 +439,8 @@ mod tests {
     fn read_write_block() -> Result<()> {
         let world = TestWorld::new();
         let mut cur = Cursor::new(world);
-        let id = cur.get_block_id((0, 0, 0))?;
-        assert_eq!(id, "minecraft:air");
+        assert_eq!(cur.get_block_id((0, 0, 0))?, "minecraft:air");
+        assert_eq!(cur.get_block_id((0, 60, 0))?, "minecraft:sponge");
         Ok(())
     }
 
@@ -291,7 +449,7 @@ mod tests {
     fn write_block() {
         let world = TestWorld::new();
         let mut cur = Cursor::new(world);
-        cur.set_block_state((1, 1, 1), State(1)).unwrap();
+        cur.set_block_meta((1, 1, 1), Meta(1)).unwrap();
     }
     
 }
