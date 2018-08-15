@@ -14,7 +14,19 @@ cur.set_block_id(pos, "minecraft:air");
  */
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
-pub struct Meta(u16); // Id, meta, etc.
+pub struct Meta {
+    inner: u16
+} // Id, meta, etc.
+
+impl Meta {
+    fn new(inner: u16) -> Meta {
+        Meta { inner }
+    }
+}
+
+// pub struct Buf {
+//     inner: Vec<u8>
+// }
 
 // `I` implies an underlying block
 #[derive(Debug, Clone)]
@@ -166,11 +178,13 @@ impl<I: AsRef<str>> PartialEq<I> for Id {
     }
 }  
 
-// a block system that maps meta with actual string id.
-// for example it converts "minecraft:stone" into Blockmeta(1). 
+// a block system maps meta with actual string id.
+// for example it converts "minecraft:stone" into Blockmeta with `1` as inner. 
 // the inner number is intended for internal use and may vary between implementations.
 // often contained in worlds. one world imply one block system, and may not change in runtime
 pub trait System {
+    // Id-Meta converting
+
     // check if this meta is registered
     fn has_block_meta(&self, meta: Meta) -> bool;
     // panic if block meta not found
@@ -179,6 +193,8 @@ pub trait System {
     fn has_block_id(&self, id: Id) -> bool;
     // panic if block meta not found
     fn block_id_to_meta(&self, id: Id) -> Meta;
+
+    // Information of block itself
 }
 
 pub trait Operate {
@@ -239,7 +255,7 @@ impl HashSystem {
 
     pub fn register_block(&mut self, id: impl Into<Id>) -> Meta {
         let id = id.into();
-        let meta = Meta(self.next_inner);
+        let meta = Meta::new(self.next_inner);
         self.itm.insert(id.clone(), meta.clone());
         self.mti.insert(meta.clone(), id);
         self.next_inner += 1;
@@ -391,6 +407,7 @@ pub trait LiquidRead {...}
 
 // PistonPolicy (varies between editions)
 // RedTransmitPolicy
+// DropPolicy
 
 // pub trait ChunkRead 
 
@@ -449,7 +466,7 @@ mod tests {
     fn write_block() {
         let world = TestWorld::new();
         let mut cur = Cursor::new(world);
-        cur.set_block_meta((1, 1, 1), Meta(1)).unwrap();
+        cur.set_block_id((1, 1, 1), "minecraft:stone").unwrap();
     }
     
 }
