@@ -164,27 +164,29 @@ impl<I: Validate> Seek for Cursor<I> {
 // an actual string id for blocks
 // available for everything except 'transparent' block
 #[derive(Clone, Debug, Hash, Eq, PartialEq)]
-pub struct Id(String);
+pub struct Id {
+    inner: String
+}
 
-impl<I: AsRef<str>> From<I> for Id{
+impl<I: ToString> From<I> for Id{
     fn from(src: I) -> Id {
-        Id(String::from(src.as_ref()))
+        Id {
+            inner: src.to_string()
+        }
     }
 }
 
 impl<I: AsRef<str>> PartialEq<I> for Id {
     fn eq(&self, other: &I) -> bool {
-        other.as_ref() == self.0
+        other.as_ref() == self.inner
     }
 }  
 
-// a block system maps meta with actual string id.
+// a system maps meta with actual string id.
 // for example it converts "minecraft:stone" into Blockmeta with `1` as inner. 
 // the inner number is intended for internal use and may vary between implementations.
 // often contained in worlds. one world imply one block system, and may not change in runtime
-pub trait System {
-    // Id-Meta converting
-
+pub trait IdSystem {
     // check if this meta is registered
     fn has_block_meta(&self, meta: Meta) -> bool;
     // panic if block meta not found
@@ -193,50 +195,27 @@ pub trait System {
     fn has_block_id(&self, id: Id) -> bool;
     // panic if block meta not found
     fn block_id_to_meta(&self, id: Id) -> Meta;
-
-    // Information of block itself
 }
 
-pub trait Operate {
+pub trait IdOperate {
 
-    fn block_system(&self) -> &dyn System;
+    fn block_id_system(&self) -> &dyn IdSystem;
 }
 
-impl<I: Operate + ReadExact + Validate> Cursor<I> {
+impl<I: IdOperate + ReadExact + Validate> Cursor<I> {
     // must ensure that this is a valid position
     pub fn get_block_id(&mut self, pos: impl Into<Pos>) -> Result<Id> {
         let meta = self.get_block_meta(pos)?;
-        Ok(self.inner.block_system().block_meta_to_id(meta))
+        Ok(self.inner.block_id_system().block_meta_to_id(meta))
     }
 }
 
-impl<I: Operate + WriteExact + Validate> Cursor<I> {
+impl<I: IdOperate + WriteExact + Validate> Cursor<I> {
     // must ensure that this is a valid position
     pub fn set_block_id(&mut self, pos: impl Into<Pos>, id: impl Into<Id>) -> Result<()> {
-        let meta = self.inner.block_system().block_id_to_meta(id.into());
+        let meta = self.inner.block_id_system().block_id_to_meta(id.into());
         self.set_block_meta(pos, meta)
     }
-}
-
-// todo: GLOBAL SYSTEM
-// pub static GLOBAL_SYSTEM: HashSystem = HashSystem::new();
-// pub static META_BLOCK_AIR: Meta = GLOBAL_SYSTEM.block_id_to_meta(Id::from("minecraft:air"));
-// pub static META_BLOCK_STONE: Meta = GLOBAL_SYSTEM.block_id_to_meta(Id::from("minecraft:stone"));
-
-macro_rules! reg_blocks {
-    ($sys: ident $(,$id_string: expr)+) => {
-        $($sys.register_block($id_string);)+
-    };
-}
-
-pub fn global_system() -> HashSystem {
-    let mut ans = HashSystem::new();
-    reg_blocks!(ans,
-        "minecraft:air",
-        "minecraft:stone",
-        "minecraft:sponge"
-    );
-    ans
 }
 
 // default system def
@@ -263,7 +242,7 @@ impl HashSystem {
     }
 }
 
-impl System for HashSystem {
+impl IdSystem for HashSystem {
     
     fn has_block_meta(&self, meta: Meta) -> bool {
         self.mti.contains_key(&meta)
@@ -281,6 +260,25 @@ impl System for HashSystem {
         self.itm[&id]
     }
 }
+
+macro_rules! reg_blocks {
+    ($($id_ident: ident, $id_string: expr,)+) => {
+
+$(pub static $id_ident: &'static str = $id_string;)+
+
+pub fn global_id_system() -> HashSystem {
+    let mut ans = HashSystem::new();
+    $(ans.register_block($id_string);)+
+    ans
+}
+    };
+}
+
+reg_blocks!(
+    ID_BLOCK_AIR, "minecraft:air",
+    ID_BLOCK_STONE, "minecraft:stone",
+    ID_BLOCK_SPONGE, "minecraft:sponge",
+);
 
 // define our own cursors
 // match with System, following PC rules
@@ -417,11 +415,11 @@ pub trait LiquidRead {...}
 mod tests {
     use crate::block::*;
     // every block is "minecraft:air" except (0, 60, 0) is "minecraft:sponge"
-    struct TestWorld(Box<System>);
+    struct TestWorld(Box<IdSystem>);
 
     impl TestWorld {
         pub fn new() -> TestWorld {
-            TestWorld(Box::new(global_system()))
+            TestWorld(Box::new(global_id_system()))
         }
     }
 
@@ -446,8 +444,8 @@ mod tests {
         }
     }
 
-    impl Operate for TestWorld {
-        fn block_system(&self) -> &dyn System {
+    impl IdOperate for TestWorld {
+        fn block_id_system(&self) -> &dyn IdSystem {
             self.0.as_ref()
         }
     }

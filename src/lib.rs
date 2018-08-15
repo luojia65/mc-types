@@ -3,6 +3,8 @@
 
 pub mod block;
 pub mod pos;
+pub mod light;
+pub mod id;
 
 /*
 
