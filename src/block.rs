@@ -1,7 +1,7 @@
-use crate::pos::BlockPos as Pos;
+pub use crate::pos::BlockPos as Pos;
+pub use crate::id::Id;
 
-pub type Error = std::io::Error;
-pub type Result<T> = std::result::Result<T, Error>;
+use std::io::{Result, Error};
 
 /*
 
@@ -19,7 +19,7 @@ pub struct Meta {
 } // Id, meta, etc.
 
 impl Meta {
-    fn new(inner: u16) -> Meta {
+    crate fn new(inner: u16) -> Meta {
         Meta { inner }
     }
 }
@@ -161,28 +161,7 @@ impl<I: Validate> Seek for Cursor<I> {
 //     fn seek_block_special(&mut self, from: Self::Special) -> Result<()>;
 // }
 
-// an actual string id for blocks
-// available for everything except 'transparent' block
-#[derive(Clone, Debug, Hash, Eq, PartialEq)]
-pub struct Id {
-    inner: String
-}
-
-impl<I: ToString> From<I> for Id{
-    fn from(src: I) -> Id {
-        Id {
-            inner: src.to_string()
-        }
-    }
-}
-
-impl<I: AsRef<str>> PartialEq<I> for Id {
-    fn eq(&self, other: &I) -> bool {
-        other.as_ref() == self.inner
-    }
-}  
-
-// a system maps meta with actual string id.
+// a system maps universal Id into internal Meta
 // for example it converts "minecraft:stone" into Blockmeta with `1` as inner. 
 // the inner number is intended for internal use and may vary between implementations.
 // often contained in worlds. one world imply one block system, and may not change in runtime
@@ -392,11 +371,11 @@ impl<I> SignRead for Cursor<I> {...}
 
 
 //procceed sth about liquid & waterlogged
-// 关于流体，存储的时候不需要分开来
 
-pub enum LiquidType {} // 自定义？
-// 是否被水淹没等信息
-pub trait LiquidRead {...}
+//流体包括空气和液体
+pub enum FluidType {} 
+
+pub trait FluidRead {...}
 
 
 // grass & flower
@@ -407,9 +386,6 @@ pub trait LiquidRead {...}
 // RedTransmitPolicy
 // DropPolicy
 
-// pub trait ChunkRead 
-
-// ChunkWrite
 
 #[cfg(test)]
 mod tests {
