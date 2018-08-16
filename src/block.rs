@@ -1,7 +1,7 @@
 pub use crate::pos::BlockPos as Pos;
 pub use crate::id::Id;
 
-use std::io::{Result, Error};
+use std::io::Result;
 
 /*
 
@@ -183,7 +183,7 @@ pub trait IdOperate {
 
 impl<I: IdOperate + ReadExact + Validate> Cursor<I> {
     // must ensure that this is a valid position
-    pub fn get_block_id(&mut self, pos: impl Into<Pos>) -> Result<Id> {
+    pub fn get_block_id(&mut self, pos: Pos) -> Result<Id> {
         let meta = self.get_block_meta(pos)?;
         Ok(self.inner.block_id_system().block_meta_to_id(meta))
     }
@@ -191,8 +191,8 @@ impl<I: IdOperate + ReadExact + Validate> Cursor<I> {
 
 impl<I: IdOperate + WriteExact + Validate> Cursor<I> {
     // must ensure that this is a valid position
-    pub fn set_block_id(&mut self, pos: impl Into<Pos>, id: impl Into<Id>) -> Result<()> {
-        let meta = self.inner.block_id_system().block_id_to_meta(id.into());
+    pub fn set_block_id(&mut self, pos: Pos, id: Id) -> Result<()> {
+        let meta = self.inner.block_id_system().block_id_to_meta(id);
         self.set_block_meta(pos, meta)
     }
 }
@@ -201,8 +201,8 @@ impl<I: IdOperate + WriteExact + Validate> Cursor<I> {
 use std::collections::HashMap;
 #[derive(Debug, Default)]
 pub struct HashSystem {
-    mti: HashMap<Meta, Id>,
-    itm: HashMap<Id, Meta>,
+    mti: HashMap<Meta, String>,
+    itm: HashMap<String, Meta>,
     next_inner: u16
 }
 
@@ -211,8 +211,8 @@ impl HashSystem {
         Default::default()
     }
 
-    pub fn register_block(&mut self, id: impl Into<Id>) -> Meta {
-        let id = id.into();
+    pub fn register_block(&mut self, id: Id) -> Meta {
+        let id = id.to_string();
         let meta = Meta::new(self.next_inner);
         self.itm.insert(id.clone(), meta.clone());
         self.mti.insert(meta.clone(), id);
@@ -228,15 +228,15 @@ impl IdSystem for HashSystem {
     }
     
     fn block_meta_to_id(&self, meta: Meta) -> Id {
-        self.mti[&meta].clone()
+        Id::new(self.mti[&meta].clone())
     }   
     
     fn has_block_id(&self, id: Id) -> bool {
-        self.itm.contains_key(&id)
+        self.itm.contains_key(&id.to_string())
     }
     
     fn block_id_to_meta(&self, id: Id) -> Meta {
-        self.itm[&id]
+        self.itm[&id.to_string()]
     }
 }
 
@@ -247,7 +247,7 @@ $(pub static $id_ident: &'static str = $id_string;)+
 
 pub fn global_id_system() -> HashSystem {
     let mut ans = HashSystem::new();
-    $(ans.register_block($id_string);)+
+    $(ans.register_block(Id::new($id_string));)+
     ans
 }
     };
@@ -390,6 +390,7 @@ pub trait FluidRead {...}
 #[cfg(test)]
 mod tests {
     use crate::block::*;
+    use std::io::Error;
     // every block is "minecraft:air" except (0, 60, 0) is "minecraft:sponge"
     struct TestWorld(Box<IdSystem>);
 
@@ -408,8 +409,8 @@ mod tests {
     impl ReadExact for TestWorld {
         fn read_block_exact(&self, pos: Pos) -> Result<Meta> {
             Ok(match pos {
-                p if p != Pos::from_xyz(0, 60, 0) => self.0.block_id_to_meta(Id::from("minecraft:air")),
-                _ => self.0.block_id_to_meta(Id::from("minecraft:sponge"))
+                p if p != Pos::from_xyz(0, 60, 0) => self.0.block_id_to_meta(Id::new("minecraft:air")),
+                _ => self.0.block_id_to_meta(Id::new("minecraft:sponge"))
             })
         }    
     }
@@ -430,8 +431,8 @@ mod tests {
     fn read_write_block() -> Result<()> {
         let world = TestWorld::new();
         let mut cur = Cursor::new(world);
-        assert_eq!(cur.get_block_id((0, 0, 0))?, "minecraft:air");
-        assert_eq!(cur.get_block_id((0, 60, 0))?, "minecraft:sponge");
+        assert_eq!(cur.get_block_id(Pos::from_xyz(0, 0, 0))?, "minecraft:air");
+        assert_eq!(cur.get_block_id(Pos::from_xyz(0, 60, 0))?, "minecraft:sponge");
         Ok(())
     }
 
@@ -440,7 +441,7 @@ mod tests {
     fn write_block() {
         let world = TestWorld::new();
         let mut cur = Cursor::new(world);
-        cur.set_block_id((1, 1, 1), "minecraft:stone").unwrap();
+        cur.set_block_id(Pos::from_xyz(1, 1, 1), Id::new("minecraft:stone")).unwrap();
     }
     
 }
