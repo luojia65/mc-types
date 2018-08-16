@@ -386,7 +386,6 @@ pub trait FluidRead {...}
 // RedTransmitPolicy
 // DropPolicy
 
-
 #[cfg(test)]
 mod tests {
     use crate::block::*;
@@ -444,4 +443,12 @@ mod tests {
         cur.set_block_id(Pos::from_xyz(1, 1, 1), Id::new("minecraft:stone")).unwrap();
     }
     
+    #[test]
+    fn seek() -> Result<()> {
+        let mut cur = Cursor::new(TestWorld::new());
+        cur.set_position(Pos::from_xyz(10, 10, 10));
+        cur.seek_block(SeekFrom::Relative(2, -1, 1))?;
+        assert_eq!(cur.position(), Pos::from_xyz(12, 9, 11));
+        Ok(())
+    }
 }
