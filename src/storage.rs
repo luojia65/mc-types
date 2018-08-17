@@ -35,9 +35,9 @@ impl<P: AsRef<Path>> McJavaWorld<P> {
     #[allow(unused)]
     fn read_session_lock(&self) -> io::Result<i64> {
         let session_lock_path = self.path.as_ref().join("session.lock");
-        let vec = fs::read(session_lock_path)?;
-        let mut cur = io::Cursor::new(vec);
-        cur.read_i64::<BigEndian>()
+        let session_lock_file = fs::File::open(session_lock_path)?;
+        session_lock_file.read_i64::<BigEndian>()
+        // files are automatically closed when they go out of scope
     }
 
 }
@@ -70,10 +70,8 @@ mod tests {
     #[test]
     fn read_level_dat() -> io::Result<()> {
         use flate2::read::GzDecoder;
-        let level_dat_path = "./test_worlds/water_only/level.dat";
-        let vec = fs::read(level_dat_path)?;
-        let cur = io::Cursor::new(vec);
-        let data = GzDecoder::new(cur).read_nbt_data()?;
+        let level_dat_file = fs::File::open("./test_worlds/water_only/level.dat")?;
+        let data = GzDecoder::new(level_dat_file).read_nbt_data()?;
         println!("{:?}", data);
         Ok(())
     }   

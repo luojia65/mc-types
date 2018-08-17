@@ -19,7 +19,7 @@ pub struct Meta {
 } // Id, meta, etc.
 
 impl Meta {
-    pub(crate) fn new(inner: u16) -> Meta {
+    crate fn new(inner: u16) -> Meta {
         Meta { inner }
     }
 }

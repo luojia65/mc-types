@@ -9,9 +9,23 @@ pub struct Chunk {
     inner: [[[u16; 16]; 256]; 16]
 } 
 
-// pub trait ChunkRead 
+impl Chunk {
+    crate fn new_zeroed() -> Chunk {
+        Chunk {
+            inner: [[[0u8; 16]; 256]; 16]
+        }
+    }
+}
 
-// ChunkWrite
+pub trait Read { // chunk::Read
+
+    fn read_chunk(&self, buf: &mut Chunk) -> Result<()>;
+}
+
+pub trait Write { // chunk::Write
+
+    fn write_chunk(&mut self, new_chunk: &Chunk) -> Result<()>;
+}
 
 pub trait ReadExact { // chunk::ReadExact
     
@@ -51,16 +65,6 @@ impl<I> Cursor<I> {
         self.pos = pos;
     }
 
-}
-
-pub trait Read { // chunk::Read
-
-    fn read_chunk(&self, buf: &mut Chunk) -> Result<()>;
-}
-
-pub trait Write { // chunk::Write
-
-    fn write_chunk(&mut self, new_chunk: &Chunk) -> Result<()>;
 }
 
 impl<I: ReadExact> Read for Cursor<I> {
