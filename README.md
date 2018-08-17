@@ -4,9 +4,7 @@ Types for Minecraft, including NBT support
 
 ## Performance  
 
-### NBT read and write
-
-(Unit: ns/iter)
+### NBT read and write by ns/iter
 
 | Item | mc-types | hematite-nbt |
 |:----:|:--------:|:------------:|
