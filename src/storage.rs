@@ -31,7 +31,8 @@ impl<P: AsRef<Path>> McJavaWorld<P> {
     // no set_permissions here as it might change in the future
 
     // Is this process id? I think it's not time here.
-    //todo!
+    //todo
+    #[allow(unused)]
     fn read_session_lock(&self) -> io::Result<i64> {
         let session_lock_path = self.path.as_ref().join("session.lock");
         let vec = fs::read(session_lock_path)?;
@@ -49,6 +50,10 @@ impl<P: AsRef<Path>> block::ReadExact for McJavaWorld<P> {
     fn read_block_exact(&self, _pos: block::Pos) -> Result<block::Meta> {
         unimplemented!()
     }
+
+    fn contain_block_exact(&self, _pos: block::Pos) -> Result<bool> {
+        unimplemented!()
+    }
 }
 
 #[cfg(test)]
@@ -62,9 +67,9 @@ mod tests {
         Ok(())
     }
 
-    use flate2::read::{GzDecoder, ZlibDecoder};
     #[test]
     fn read_level_dat() -> io::Result<()> {
+        use flate2::read::GzDecoder;
         let level_dat_path = "./test_worlds/water_only/level.dat";
         let vec = fs::read(level_dat_path)?;
         let cur = io::Cursor::new(vec);
