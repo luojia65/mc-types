@@ -8,44 +8,11 @@ NBT是我见过效率最低、适用面最窄的数据结构
 NbtRead // io::read
 NbtWrite
 NbtValue
-NbtFlate
-
-
-// create a structure for following NBT read/write
-NbtVia 
-
-// decalres `level_name` and `generator_name`
-let via = nbt_via!{
-    "" compound matches {    
-        "Data" compound matches {
-            "LevelName" into level_name
-            "generatorName" into generator_name 
-            "version" matches int 19133
-        }
-    }
-};
-// or declare like this:
-let mut via = NbtVia::new();
-via.split(".");
-via.add_type_match("", TYPE_ID_COMPOUND);
-via.add_type_match(".Data", TYPE_ID_COMPOUND);
-via.add_value_match(".Data.version", Tag::Int(19133));
-let mut level_name;
-via.add_value_parse(".Data.LevelName", &mut level_name);
-let mut generator_name;
-via.add_value_parse(".Data.generatorName", &mut generator_name);
-
-let mut cur = Cursor::new(buf);
-via.parse(&mut cur)?;
-// uses `level_name` and `generator_name` which are both instances of Tag
-println!("Name: {:?}, Generaor: {:?}", level_name, generator_name);
 
  */
 use byteorder::{BigEndian, ReadBytesExt};//, WriteBytesExt};
-
 use std::collections::HashMap;
-
-type Meta = (u8, String);
+use std::io::{Error, ErrorKind, Result};
 
 const TYPE_ID_END: u8 = 0;
 const TYPE_ID_BYTE: u8 = 1;
@@ -83,8 +50,72 @@ pub enum Tag {
     LongArray(Vec<i64>)
 }
 
-// impl Tag {
+pub type Meta = (u8, String);
 
+pub trait Read {
+
+    // fn read_nbt_meta() 
+    // fn read_nbt_content()
+    // fn skip_nbt_content()
+    // 
+
+    fn read_nbt_data(&mut self) -> Result<Data>;
+}
+//今天就到这儿。。。
+/* ------- Implmentations (Skip Mode) -------- */
+
+/*
+// create a structure for following NBT read/write
+NbtVia 
+
+// decalres `level_name` and `generator_name`
+let via = nbt_via!{
+    "" compound matches {    
+        "Data" compound matches {
+            "LevelName" into level_name
+            "generatorName" into generator_name 
+            "version" matches int 19133
+        }
+    }
+};
+// or declare like this:
+let mut via = NbtVia::new();
+via.split(".");
+via.add_type_match("", TYPE_ID_COMPOUND);
+via.add_type_match(".Data", TYPE_ID_COMPOUND);
+via.add_value_match(".Data.version", Tag::Int(19133));
+let mut level_name;
+via.add_value_parse(".Data.LevelName", &mut level_name);
+let mut generator_name;
+via.add_value_parse(".Data.generatorName", &mut generator_name);
+
+let mut cur = Cursor::new(buf);
+via.parse(&mut cur)?;
+// uses `level_name` and `generator_name` which are both instances of Tag
+println!("Name: {:?}, Generaor: {:?}", level_name, generator_name);
+ */
+
+// put path mapper into it, read out data only what we want
+pub trait ReadPolicy {
+    
+    fn accepts_nbt_meta(meta: Meta) -> bool;
+}
+
+
+static NBT_SPLIT_TERMINATOR: char = '.';
+
+
+/*
+
+
+
+ */
+
+/* ------- Implmentations (Full-Read Mode) -------- */
+/* ------- For tests only -------- */
+
+// use for nbt write
+// impl Tag {
 //     fn type_id(&self) -> u8 {
 //         use self::Tag::*;
 // 	    match self {
@@ -104,13 +135,6 @@ pub enum Tag {
 // 	    }
 //     }
 // }
-
-use std::io::{Error, ErrorKind, Result};
-
-pub trait Read {
-
-    fn read_nbt_data(&mut self) -> Result<Data>;
-}
 
 impl<T> Read for T where T: std::io::Read {
 
@@ -275,6 +299,9 @@ pub static TEST_BIG_UNCOMPRESSED: &[u8] = &[
             0x1d, 0xdd, 0xdd, 0xdd, 
     0x0, // end of #1
 ];  
+
+
+/* ------- Tests -------- */
 
 #[cfg(test)]
 mod tests {
