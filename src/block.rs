@@ -111,8 +111,7 @@ impl<I: Validate> Cursor<I> {
 
 impl<I: ReadExact + Validate> Cursor<I> {
     // must ensure that this is a valid position
-    pub fn get_block_meta(&mut self, pos: impl Into<Pos>) -> Result<Meta> {
-        let pos = pos.into();
+    pub fn get_block_meta(&mut self, pos: Pos) -> Result<Meta> {
         self.set_position(pos);
         self.read_block()
     }
@@ -120,8 +119,7 @@ impl<I: ReadExact + Validate> Cursor<I> {
 
 impl<I: WriteExact + Validate> Cursor<I> {
     // must ensure that this is a valid position
-    pub fn set_block_meta(&mut self, pos: impl Into<Pos>, meta: Meta) -> Result<()> {
-        let pos = pos.into();
+    pub fn set_block_meta(&mut self, pos: Pos, meta: Meta) -> Result<()> {
         self.set_position(pos);
         self.write_block(meta)
     }

@@ -46,7 +46,7 @@ use std::io::Result;
 
 impl<P: AsRef<Path>> block::ReadExact for McJavaWorld<P> {
     
-    fn read_block_exact(&self, pos: block::Pos) -> Result<block::Meta> {
+    fn read_block_exact(&self, _pos: block::Pos) -> Result<block::Meta> {
         unimplemented!()
     }
 }
