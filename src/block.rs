@@ -28,13 +28,35 @@ impl Meta {
 //     inner: Vec<u8>
 // }
 
-// usually for wrappers, such as `Cursor`
+/*
+
+Where is the difference between Read and ReadExact?
+
+Read somehow provides a way to read a block at one position,
+which is useful for continuously monitoring of one single block.
+For example we can have a SignCursor<T> where T: block::Read
+to help read a string value of one single block of sign
+whose text might change as we concern.
+
+Never add event system into it!
+
+Developers must note that this is not relevant with event system.
+This Read trait should only be used in low-level storage.
+Do NOT even try to add a event hook into this trait - it would
+be inappropriate with the original intention of this name of Read.
+Never modify this trait without careful thinking.
+
+-- Luo Jia
+
+*/
+
+// usually for wrappers, such as `Cursor`, `SignCursor`, etc.
 pub trait Read { // block::Read
     // read the block from current position.
     // the current position is NOT advanced.
-    // panic if the current position is not valid
+    // panic if there is no block at current position
     fn read_block(&self) -> Result<Meta>;
-
+    // check if there is a block at current position
     fn check_current_block(&self) -> Result<bool>;
 }
 
@@ -105,7 +127,7 @@ pub trait IdOperate {
     fn block_id_system(&self) -> &dyn IdSystem;
 }
 
-// `I` implies an underlying block
+// `I` implies an underlying block storage
 #[derive(Debug, Clone)]
 pub struct Cursor<I> { // block::Cursor
     inner: I,

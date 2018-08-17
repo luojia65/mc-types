@@ -15,17 +15,14 @@ pub struct Chunk {
 
 pub trait ReadExact { // chunk::ReadExact
     
-    fn read_chunk_exact(&self, pos: Pos, buf: &mut Chunk) -> Result<()>; 
+    fn read_chunk_exact(&self, pos: Pos, buf: &mut Chunk) -> Result<()>;
+
+    fn contains_chunk(&self, pos: Pos) -> Result<bool>;
 }
 
 pub trait WriteExact { // chunk::WriteExact
     // write a whole chunk
     fn write_chunk_exact(&mut self, pos: Pos, chunk: &Chunk) -> Result<()>; 
-}
-
-pub trait Validate { // chunk::Validate
-
-    fn contains_chunk(&self, pos: Pos) -> Result<bool>;
 }
 
 pub struct Cursor<I> { // chunk::Cursor
