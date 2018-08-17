@@ -1,4 +1,9 @@
 /*
+NBT是我见过效率最低、适用面最窄的数据结构
+当初哪个开发者发明的，出来让我打一顿
+*/
+
+/*
 
 NbtRead // io::read
 NbtWrite
@@ -113,7 +118,7 @@ impl<T> Read for T where T: std::io::Read {
         let (root_id, root_name) = read_meta(self)?;
         if root_id != TYPE_ID_COMPOUND {
             return Err(
-                Error::new(ErrorKind::InvalidData, "Invalid NBT header")
+                Error::new(ErrorKind::InvalidData, format!("Invalid NBT header: {}", root_id))
             );
         }
         let content = read_content(self, root_id)?;
@@ -144,7 +149,7 @@ fn read_meta<R: std::io::Read>(read: &mut R) -> Result<Meta> {
     match read.read_u8()? {
         TYPE_ID_END => Ok((TYPE_ID_END, "".to_string())),
         id @ 1..=12 => Ok((id, read_string(read)?)),
-        _ => Err(Error::new(ErrorKind::InvalidData, "Invalid NBT tag id"))
+        invalid_id => Err(Error::new(ErrorKind::InvalidData, format!("Invalid NBT tag id: {}", invalid_id)))
     }
 }
 
@@ -211,7 +216,7 @@ fn read_content<R: std::io::Read>(read: &mut R, type_id: u8) -> Result<Tag> {
         },
         TYPE_ID_INT_ARRAY => read_int_array_content(read),
         TYPE_ID_LONG_ARRAY => read_long_array_content(read),
-        _ => Err(Error::new(ErrorKind::InvalidData, "Invalid NBT tag id"))
+        invalid_id => Err(Error::new(ErrorKind::InvalidData, format!("Invalid NBT tag id: {}", invalid_id)))
     }
 }
 

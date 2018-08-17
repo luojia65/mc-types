@@ -3,8 +3,9 @@
 // a chunk contains 16*128*16 blocks. by referring to a block system,
 
 pub use crate::pos::ChunkPos as Pos;
+use std::io::Result;
 
-#[derive(Clone, Eq, PartialEq, Hash, Debug)] // does NOT derive Copy as it's expensive
+#[derive(Clone)] // does NOT derive Copy as it's expensive
 pub struct Chunk {
     inner: [[[u16; 16]; 256]; 16]
 } 
@@ -12,7 +13,7 @@ pub struct Chunk {
 impl Chunk {
     crate fn new_zeroed() -> Chunk {
         Chunk {
-            inner: [[[0u8; 16]; 256]; 16]
+            inner: [[[0u16; 16]; 256]; 16]
         }
     }
 }
@@ -31,7 +32,7 @@ pub trait ReadExact { // chunk::ReadExact
     
     fn read_chunk_exact(&self, pos: Pos, buf: &mut Chunk) -> Result<()>;
 
-    fn contains_chunk(&self, pos: Pos) -> Result<bool>;
+    fn contains_chunk_exact(&self, pos: Pos) -> Result<bool>;
 }
 
 pub trait WriteExact { // chunk::WriteExact
