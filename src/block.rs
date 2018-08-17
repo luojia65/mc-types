@@ -19,7 +19,7 @@ pub struct Meta {
 } // Id, meta, etc.
 
 impl Meta {
-    crate fn new(inner: u16) -> Meta {
+    pub(crate) fn new(inner: u16) -> Meta {
         Meta { inner }
     }
 }
@@ -27,6 +27,83 @@ impl Meta {
 // pub struct Buf {
 //     inner: Vec<u8>
 // }
+
+// usually for wrappers, such as `Cursor`
+pub trait Read { // block::Read
+    // read the block from current position.
+    // the current position is NOT advanced.
+    // panic if the current position is not valid
+    fn read_block(&self) -> Result<Meta>;
+
+    fn check_current_block(&self) -> Result<bool>;
+}
+
+// usually for wrappers, such as `Cursor`
+pub trait Write { // block::Write
+    // write the block into current position.
+    // the current position is NOT advanced. 
+    // the writer may also initialize block buffer for it
+    // panic if the current position is not valid
+    fn write_block(&mut self, new_meta: Meta) -> Result<()>;
+    // ensure the blocks reach their destination
+    // for example, saved to files
+    fn flush_block(&mut self) -> Result<()>;
+}
+
+// usually for buffered world itself
+pub trait ReadExact {
+    // read block exactly at the position `pos`
+    fn read_block_exact(&self, pos: Pos) -> Result<Meta>;
+
+    fn contain_block_exact(&self, pos: Pos) -> Result<bool>;
+}
+
+// usually for buffered world itself
+pub trait WriteExact {
+
+    fn write_block_exact(&mut self, pos: Pos, meta: Meta) -> Result<()>;
+
+    fn flush_block(&mut self) -> Result<()>;
+}
+
+
+pub enum SeekFrom {
+    Absolute(Pos),
+    Relative(i32, i32, i32),
+}
+
+pub trait Seek {
+    
+    fn seek_block(&mut self, from: SeekFrom) -> Result<()>;
+}
+
+// // Spawn point and other stuff
+// pub trait SeekSpecial {
+
+//     type Special;
+
+//     fn seek_block_special(&mut self, from: Self::Special) -> Result<()>;
+// }
+
+// a system maps universal Id into internal Meta
+// for example it converts "minecraft:stone" into Meta with `1` as inner.
+// the inner number is intended for internal use and may vary between implementations.
+// often contained in worlds. one world imply one block system, and may not change in runtime
+pub trait IdSystem {
+    // check if this meta is registered
+    fn has_block_meta(&self, meta: Meta) -> bool;
+    // panic if block meta not found
+    fn block_meta_to_id(&self, meta: Meta) -> Id;
+    // check if this block id is registered
+    fn has_block_id(&self, id: Id) -> bool;
+    // panic if block meta not found
+    fn block_id_to_meta(&self, id: Id) -> Meta;
+}
+
+pub trait IdOperate {
+
+    fn block_id_system(&self) -> &dyn IdSystem;
+}
 
 // `I` implies an underlying block
 #[derive(Debug, Clone)]
@@ -57,85 +134,61 @@ impl<I> Cursor<I> {
 
 }
 
-// usually for wrappers, such as `Cursor`
-pub trait Read { // block::Read
-    // read the block from currect position.
-    // the current position is NOT advanced.
-    // panic if the currect position is not valid
-    fn read_block(&self) -> Result<Meta>;
-}
-
-// usually for wrappers, such as `Cursor`
-pub trait Write { // block::Write
-    // write the block into currect position.
-    // the current position is NOT advanced. 
-    // the writer may also initalize block buffer for it
-    // panic if the currect position is not valid
-    fn write_block(&mut self, new_meta: Meta) -> Result<()>;
-}
-
-// usually for buffered world itself
-pub trait ReadExact {
-    // read block exactly at the position `pos`
-    fn read_block_exact(&self, pos: Pos) -> Result<Meta>; 
-}
-
-// usually for buffered world itself
-pub trait WriteExact {
-
-    fn write_block_exact(&mut self, pos: Pos, meta: Meta) -> Result<()>; 
-}
-
-impl<I: ReadExact> Read for Cursor<I> {
-    fn read_block(&self) -> Result<Meta> {
-        self.inner.read_block_exact(self.pos)
-    } 
-} 
- 
-impl<I: WriteExact> Write for Cursor<I> {
-    fn write_block(&mut self, new_meta: Meta) -> Result<()> {
-        self.inner.write_block_exact(self.pos, new_meta)
-    }
-}
-
-pub trait Validate {
-
-    fn contains_block(&self, pos: Pos) -> Result<bool>;
-}
-
-impl<I: Validate> Cursor<I> {
-    pub fn check_current_block(&self) -> Result<bool> {
-        self.inner.contains_block(self.pos)
-    }
-}
-
-impl<I: ReadExact + Validate> Cursor<I> {
-    // must ensure that this is a valid position
+impl<I: ReadExact> Cursor<I> {
+    // must check that this is at a valid position first
+    // or this method will panic
     pub fn get_block_meta(&mut self, pos: Pos) -> Result<Meta> {
         self.set_position(pos);
         self.read_block()
     }
 }
 
-impl<I: WriteExact + Validate> Cursor<I> {
-    // must ensure that this is a valid position
+impl<I: ReadExact> Read for Cursor<I> {
+    fn read_block(&self) -> Result<Meta> {
+        self.inner.read_block_exact(self.pos)
+    }
+
+    fn check_current_block(&self) -> Result<bool> {
+        self.inner.contain_block_exact(self.pos)
+    }
+}
+
+impl<I: WriteExact> Cursor<I> {
+    // must ensure that this is at a valid position first
+    // or this method will panic
     pub fn set_block_meta(&mut self, pos: Pos, meta: Meta) -> Result<()> {
         self.set_position(pos);
         self.write_block(meta)
     }
 }
 
-pub enum SeekFrom {
-    Absolute(Pos),
-    Relative(i32, i32, i32),
+impl<I: WriteExact> Write for Cursor<I> {
+    fn write_block(&mut self, new_meta: Meta) -> Result<()> {
+        self.inner.write_block_exact(self.pos, new_meta)
+    }
+
+    fn flush_block(&mut self) -> Result<()> {
+        self.inner.flush_block()
+    }
 }
 
-pub trait Seek {
-    
-    fn seek_block(&mut self, from: SeekFrom) -> Result<()>;
+impl<I: IdOperate + ReadExact> Cursor<I> {
+    // must ensure that this is a valid position
+    pub fn get_block_id(&mut self, pos: Pos) -> Result<Id> {
+        let meta = self.get_block_meta(pos)?;
+        Ok(self.inner.block_id_system().block_meta_to_id(meta))
+    }
 }
 
-impl<I: Validate> Seek for Cursor<I> {
+impl<I: IdOperate + WriteExact> Cursor<I> {
+    // must ensure that this is a valid position
+    pub fn set_block_id(&mut self, pos: Pos, id: Id) -> Result<()> {
+        let meta = self.inner.block_id_system().block_id_to_meta(id);
+        self.set_block_meta(pos, meta)
+    }
+}
+
+impl<I> Seek for Cursor<I> {
 
     fn seek_block(&mut self, from: SeekFrom) -> Result<()> {
         use self::SeekFrom::*;
@@ -147,51 +200,7 @@ impl<I: Validate> Seek for Cursor<I> {
             },
         };
         self.set_position(pos);
-        Ok(()) 
-    }
-} 
-
-// // Spawn point and other stuff
-// pub trait SeekSpecial {
-
-//     type Special;
-
-//     fn seek_block_special(&mut self, from: Self::Special) -> Result<()>;
-// }
-
-// a system maps universal Id into internal Meta
-// for example it converts "minecraft:stone" into Blockmeta with `1` as inner. 
-// the inner number is intended for internal use and may vary between implementations.
-// often contained in worlds. one world imply one block system, and may not change in runtime
-pub trait IdSystem {
-    // check if this meta is registered
-    fn has_block_meta(&self, meta: Meta) -> bool;
-    // panic if block meta not found
-    fn block_meta_to_id(&self, meta: Meta) -> Id;
-    // check if this block id is registered
-    fn has_block_id(&self, id: Id) -> bool;
-    // panic if block meta not found
-    fn block_id_to_meta(&self, id: Id) -> Meta;
-}
-
-pub trait IdOperate {
-
-    fn block_id_system(&self) -> &dyn IdSystem;
-}
-
-impl<I: IdOperate + ReadExact + Validate> Cursor<I> {
-    // must ensure that this is a valid position
-    pub fn get_block_id(&mut self, pos: Pos) -> Result<Id> {
-        let meta = self.get_block_meta(pos)?;
-        Ok(self.inner.block_id_system().block_meta_to_id(meta))
-    }
-}
-
-impl<I: IdOperate + WriteExact + Validate> Cursor<I> {
-    // must ensure that this is a valid position
-    pub fn set_block_id(&mut self, pos: Pos, id: Id) -> Result<()> {
-        let meta = self.inner.block_id_system().block_id_to_meta(id);
-        self.set_block_meta(pos, meta)
+        Ok(())
     }
 }
 
@@ -239,9 +248,9 @@ impl IdSystem for HashSystem {
 }
 
 macro_rules! reg_blocks {
-    ($($id_ident: ident, $id_string: expr,)+) => {
+    ($($id_name: ident, $id_string: expr,)+) => {
 
-$(pub static $id_ident: &'static str = $id_string;)+
+$(pub static $id_name: &'static str = $id_string;)+
 
 pub fn global_id_system() -> HashSystem {
     let mut ans = HashSystem::new();
@@ -291,7 +300,7 @@ End rod: facing
 Farmland: moisture 0~7
 Fence: north, south, east, west, waterlogged
 Fence gate: facing, in_wall, open, powered
-Fire: age, up, noeth, south, east, west
+Fire: age, up, north, south, east, west
 Frosted Ice: age 0~3
 Furnace: facing, lit
 Glass pane(Stained ~): north, south, east, west, waterlogged
@@ -347,7 +356,7 @@ Sugar canes: age 0~15
 Tall grass, Large fern: half
 TNT: unstable //needs test
 Trapdoor: facing, half, open, powered, waterlogged 
-Tripwire: attached, disarmed, notrh, south. easet, west, powered
+Tripwire: attached, disarmed, north, south. east, west, powered
 Tripwire hook: attached, facing, powered
 Turtle egg: eggs 1~4, hatch 0~2
 Vines: north, south, east, west, up
@@ -387,7 +396,7 @@ pub trait FluidRead {...}
 #[cfg(test)]
 mod tests {
     use crate::block::*;
-    use std::io::Error;
+    use std::io::{Error, Result};
     // every block is "minecraft:air" except (0, 60, 0) is "minecraft:sponge"
     struct TestWorld(Box<IdSystem>);
 
@@ -397,24 +406,26 @@ mod tests {
         }
     }
 
-    impl Validate for TestWorld {
-        fn contains_block(&self, _pos: Pos) -> Result<bool> {
-            Ok(true) // every block is valid
-        }
-    }
-
     impl ReadExact for TestWorld {
         fn read_block_exact(&self, pos: Pos) -> Result<Meta> {
             Ok(match pos {
                 p if p != Pos::from_xyz(0, 60, 0) => self.0.block_id_to_meta(Id::new("minecraft:air")),
                 _ => self.0.block_id_to_meta(Id::new("minecraft:sponge"))
             })
-        }    
+        }
+
+        fn contain_block_exact(&self, _pos: Pos) -> Result<bool> {
+            Ok(true) // every block is valid
+        }
     }
 
     impl WriteExact for TestWorld {
         fn write_block_exact(&mut self, _pos: Pos, _meta: Meta) -> Result<()> {
             Err(Error::new(std::io::ErrorKind::PermissionDenied, "Operation not supported"))
+        }
+
+        fn flush_block(&mut self) -> Result<()> {
+            Ok(()) // no-op
         }
     }
 
